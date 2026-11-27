@@ -1,0 +1,95 @@
+<title>Mapa de Open MCT</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  :root { --bg:#fbf7f3; --card:#fff; --ink:#2a211c; --muted:#6f625a; --line:#e3d6cc; --mars:#c2502a; --soft:#f6e6dc; --tele:#1f6f8b; --telesoft:#e1f0f5; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#1a1512; --card:#241d19; --ink:#f1e8e1; --muted:#b3a59b; --line:#3d322c; --mars:#e57b52; --soft:#3a2419; --tele:#6cc0dc; --telesoft:#15303a; color-scheme:dark; } }
+  :root[data-theme="dark"] { --bg:#1a1512; --card:#241d19; --ink:#f1e8e1; --muted:#b3a59b; --line:#3d322c; --mars:#e57b52; --soft:#3a2419; --tele:#6cc0dc; --telesoft:#15303a; color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:17px/1.6 system-ui, "Segoe UI", sans-serif; }
+  main { max-width:860px; margin:0 auto; padding-block:40px 64px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size:2rem; margin:0 0 8px; }
+  h2 { font-size:1.35rem; margin:48px 0 12px; color:var(--mars); }
+  .lead { font-size:1.25rem; background:var(--soft); border-left:5px solid var(--mars); padding:16px 20px; border-radius:8px; }
+  code { font:0.82em ui-monospace, Consolas, monospace; background:var(--soft); padding:1px 5px; border-radius:4px; word-break:break-all; }
+  .muted { color:var(--muted); font-size:.92rem; }
+  .flow { display:flex; flex-direction:column; align-items:stretch; gap:0; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .box { min-width:0; background:var(--card); border:2px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .box b { display:block; }
+  .box small { color:var(--muted); display:block; margin:2px 0 6px; }
+  .box.core { border-color:var(--mars); }
+  .box.tele { border-color:var(--tele); background:var(--telesoft); }
+  .arrow { text-align:center; color:var(--muted); font-size:1.5rem; line-height:1.2; padding:4px 0; }
+  .arrow span { font-size:.85rem; display:block; }
+  .tag { font-size:.75rem; font-weight:600; padding:2px 8px; border-radius:99px; color:#fff; background:var(--mars); }
+  .tag.t { background:var(--tele); }
+  ol.pieces > li, ol.steps > li { margin-bottom:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 20px; }
+  table { width:100%; border-collapse:collapse; font-size:.95rem; }
+  td { padding:8px 6px; border-top:1px solid var(--line); vertical-align:top; }
+</style>
+<main>
+  <h1>🛰️ Mapa de Open MCT</h1>
+  <p class="lead"><b>Open MCT es como el tablero de un coche, pero para una nave espacial:</b> una página web donde la NASA junta los datos que mandan sus misiones (temperaturas, baterías, posiciones) y los muestra en gráficas y tablas en tiempo real.</p>
+
+  <h2>1. El diagrama: cómo está armado y cómo viaja un dato</h2>
+  <p>Las cajas <span class="tag">rojas</span> son el <b>núcleo</b> (el motor del tablero). Las <span class="tag t">azules</span> son el <b>viaje de un dato</b> desde que llega hasta que se dibuja.</p>
+
+  <div class="flow">
+    <div class="box core"><b>La aplicación (una sola)</b><small>Se crea el "tablero" vacío.</small><code>openmct.js:35</code></div>
+    <div class="arrow">↓<span>al nacer, le pone sus herramientas</span></div>
+    <div class="row">
+      <div class="box core"><b>Reloj (tiempo)</b><small>Qué rango de horas se mira.</small><code>src/MCT.js:113</code></div>
+      <div class="box core"><b>Tipos de objeto</b><small>"Sensor", "carpeta", "gráfica"…</small><code>src/MCT.js:167</code></div>
+      <div class="box core"><b>Objetos</b><small>El árbol de cosas que ves a la izquierda.</small><code>src/MCT.js:175</code></div>
+      <div class="box core"><b>Telemetría</b><small>La central de datos.</small><code>src/MCT.js:183</code></div>
+    </div>
+    <div class="arrow">↓<span>se le enchufan piezas extra</span></div>
+    <div class="box core"><b>Plugins (enchufes)</b><small>Un plugin es solo una función que recibe el tablero y le agrega cosas.</small><code>src/MCT.js:435</code> · lista en <code>src/plugins/plugins.js:97</code></div>
+    <div class="arrow">↓<span>un plugin registra una fuente de datos</span></div>
+    <div class="box tele"><b>① El proveedor se anota</b><small>"Yo sé dar datos de este sensor".</small><code>example/generator/plugin.js:166</code> → <code>src/api/telemetry/TelemetryAPI.js:167</code></div>
+    <div class="arrow">↓</div>
+    <div class="box tele"><b>② La ficha del dato (metadatos)</b><small>Dice qué es la hora (eje X) y qué es el valor (eje Y).</small><code>example/generator/GeneratorMetadataProvider.js:10</code></div>
+    <div class="arrow">↓<span>la gráfica pide datos</span></div>
+    <div class="row">
+      <div class="box tele"><b>③a Datos del pasado</b><small>Pide lo que pasó en el rango de horas del reloj.</small><code>src/plugins/plot/configuration/PlotSeries.js:228</code></div>
+      <div class="box tele"><b>③b Datos en vivo</b><small>Se suscribe para recibir cada dato nuevo.</small><code>src/plugins/plot/configuration/PlotSeries.js:214</code></div>
+    </div>
+    <div class="arrow">↓<span>la central busca al proveedor correcto</span></div>
+    <div class="box tele"><b>④ La central reparte</b><small>Completa la petición con las horas del reloj y llama al proveedor.</small><code>src/api/telemetry/TelemetryAPI.js:470</code> · <code>:529</code></div>
+    <div class="arrow">↓</div>
+    <div class="box tele"><b>⑤ Se guarda el punto</b><small>Lo ordena por hora y avisa "¡llegó un punto!".</small><code>src/plugins/plot/configuration/PlotSeries.js:436</code></div>
+    <div class="arrow">↓</div>
+    <div class="box tele"><b>⑥ Se dibuja en la gráfica</b><small>La tarjeta de video pinta la línea.</small><code>src/plugins/plot/draw/DrawWebGL.js:204</code></div>
+  </div>
+
+  <h2>2. Las 5 piezas clave para conectar Percy</h2>
+  <ol class="pieces">
+    <li><b>Un plugin propio</b>: una función <code>function (openmct) {…}</code> que se instala con <code>openmct.install()</code>. <span class="muted">Ref: <code>src/MCT.js:435</code></span></li>
+    <li><b>Una carpeta raíz "Percy"</b> en el árbol de la izquierda, con <code>openmct.objects.addRoot</code>. <span class="muted">Ref: <code>src/api/objects/ObjectAPI.js:498</code></span></li>
+    <li><b>Un proveedor de objetos</b> que diga qué sensores tiene Percy (batería, temperatura, distancia). <span class="muted">Ref: <code>src/api/objects/ObjectAPI.js:168</code>, ejemplo en <code>src/plugins/staticRootPlugin/plugin.js:53</code></span></li>
+    <li><b>Un tipo "sensor de Percy"</b> con <code>openmct.types.addType</code>. <span class="muted">Ref: <code>src/api/types/TypeRegistry.js:59</code>, ejemplo en <code>example/generator/plugin.js:64</code></span></li>
+    <li><b>Un proveedor de telemetría</b> que sepa dar datos del pasado (<code>request</code>) y en vivo (<code>subscribe</code>), con su ficha de metadatos. <span class="muted">Ref: <code>src/api/telemetry/TelemetryAPI.js:167</code>, ejemplo en <code>example/generator/GeneratorProvider.js:98</code> y <code>:104</code></span></li>
+  </ol>
+
+  <h2>3. Cómo conectamos Percy</h2>
+  <div class="card">
+  <ol class="steps">
+    <li><b>Hacer que nuestro simulador cuente lo que pasa.</b> Cada segundo, <code>perseverance.html</code> anota la hora, la batería, la distancia recorrida y la posición del rover.</li>
+    <li><b>Abrir un canal de datos.</b> Nuestro servidor (<code>server.js</code>) reparte esos datos: una lista con lo que ya pasó, y un canal en vivo (WebSocket) para lo nuevo.</li>
+    <li><b>Crear el plugin "Percy"</b> copiando la forma del ejemplo <code>example/generator/plugin.js</code>: registrar el tipo (paso 4 de las piezas) y la carpeta raíz (pieza 2).</li>
+    <li><b>Describir los sensores</b>: para cada uno, una ficha con <code>utc</code> como hora (eje X) y su valor (eje Y), igual que <code>GeneratorMetadataProvider.js:10</code>.</li>
+    <li><b>Escribir el proveedor de telemetría</b>: <code>request()</code> pide la lista al servidor; <code>subscribe()</code> escucha el canal en vivo y llama al callback con cada dato.</li>
+    <li><b>Instalarlo</b> con <code>openmct.install(PercyPlugin())</code> antes de <code>openmct.start()</code> (<code>src/MCT.js:411</code>).</li>
+    <li><b>Probar</b>: abrir Open MCT, entrar a la carpeta "Percy", hacer clic en "Batería" y ver la gráfica moverse mientras manejamos el rover.</li>
+  </ol>
+  </div>
+
+  <h2>4. Qué versión miramos</h2>
+  <table>
+    <tr><td>Repositorio</td><td><code>github.com/nasa/openmct</code></td></tr>
+    <tr><td>Commit</td><td><code>15ad062c5175a6959ba9b3af90160bdb90f3756f</code></td></tr>
+    <tr><td>Fecha</td><td>23 de noviembre de 2026 — "Update security reporting (#8472)"</td></tr>
+  </table>
+  <p class="muted">Los números de línea valen para este commit; en versiones nuevas pueden moverse.</p>
+</main>

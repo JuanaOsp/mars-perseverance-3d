@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marte – Cráter Jezero</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #c98a4b; }
+  #titulo { position: fixed; left: 24px; bottom: 20px; color: #fff3e0; font: 600 14px/1.4 system-ui, sans-serif;
+            letter-spacing: .2em; text-transform: uppercase; text-shadow: 0 1px 6px rgba(60,20,0,.6); pointer-events: none; }
+
+  /* ---------- Control de misión (panel tipo Open MCT) ---------- */
+  #mision { position: fixed; top: 16px; right: 16px; bottom: 60px; width: 330px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 10px; padding: 12px;
+            background: rgba(28, 14, 8, .84); border: 1px solid rgba(255, 190, 120, .35); border-radius: 10px;
+            color: #ffe9d2; font: 13px/1.4 system-ui, sans-serif;
+            transition: opacity .3s, transform .3s; }
+  #mision.oculto { opacity: 0; transform: translateX(30px); pointer-events: none; }
+  #mision h2 { margin: 0; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: #ffb472;
+               display: flex; justify-content: space-between; }
+  #mision h2 small { letter-spacing: .05em; text-transform: none; color: #c9a58a; font-weight: 400; }
+  .dato { background: rgba(0, 0, 0, .25); border-left: 3px solid #ff8a3d; border-radius: 6px; padding: 8px 10px; }
+  .dato .cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .dato .nombre { font-weight: 600; color: #ffcf9e; }
+  .dato .prov { font: 10px ui-monospace, Consolas, monospace; color: #c9a58a; }
+  .dato .valor { font: 700 22px ui-monospace, Consolas, monospace; color: #fff; font-variant-numeric: tabular-nums; }
+  .dato .valor small { font-size: 12px; color: #ffb472; margin-left: 4px; }
+  .dato canvas { width: 100%; height: 46px; display: block; margin: 4px 0; }
+  .dato .frase { color: #e8cdb5; font-size: 12px; }
+  .dato.cargando .valor { color: #a88; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="titulo">Cráter Jezero · WASD para manejar · T control de misión · <span id="dist">0 m</span></div>
+<div id="mision">
+  <h2>Control de misión <small id="fuente">conectando…</small></h2>
+  <div id="datos"></div>
+</div>
+
+<script type="module">
+// =====================================================================
+// CONTROL DE MISIÓN — mismo patrón que Open MCT:
+//  1. Cada dato tiene una "ficha" (nombre, unidad, proveedor, qué significa).
+//  2. Un "proveedor" sabe dar el historial (request) y, si puede, datos en vivo (subscribe).
+//  3. El panel le pide los datos a la central y los dibuja en una gráfica.
+// =====================================================================
+const telemetria = { proveedores: [], addProvider(p) { this.proveedores.push(p); } };
+window.controlMision = { cargados: {}, listos: 0 };   // npm run check revisa esto
+
+const SOL_MS = 88775244;                          // un día marciano (sol) en milisegundos
+const ATERRIZAJE = Date.UTC(2021, 1, 18, 20, 55); // 18 feb 2021, cráter Jezero
+const solDe = (fecha) => (fecha - ATERRIZAJE) / SOL_MS;
+
+// ---------- Proveedor 1: historial de manejos de la NASA ----------
+let historial = null;
+async function pedirHistorial() {
+  if (!historial) historial = fetch('/api/waypoints').then(async r => {
+    if (!r.ok) throw new Error('El servidor no pudo traer los datos de la NASA');
+    document.getElementById('fuente').textContent = r.headers.get('X-Fuente') === 'nasa-en-vivo' ? 'NASA · en vivo' : 'NASA · copia guardada';
+    const puntos = (await r.json()).features.map(f => f.properties);
+    return puntos.sort((a, b) => a.sol - b.sol || a.dist_total_m - b.dist_total_m);
+  });
+  return historial;
+}
+function proveedorNASA(key, nombre, unidad, campo, frase, decimales, escala = 1, soloCrece = false) {
+  return {
+    key, nombre, unidad, frase, decimales, proveedor: 'NASA · M20_waypoints.json',
+    async request() {
+      let maximo = -Infinity;   // algunos registros traen la distancia en 0: la distancia total nunca baja
+      return (await pedirHistorial()).map(p => ({ x: p.sol, y: soloCrece ? (maximo = Math.max(maximo, p[campo] * escala)) : p[campo] * escala }));
+    },
+  };
+}
+telemetria.addProvider(proveedorNASA('distancia', 'Distancia recorrida', 'km', 'dist_total_m',
+  'Todo lo que Percy ha manejado desde que aterrizó.', 2, 1 / 1000, true));
+telemetria.addProvider(proveedorNASA('altura', 'Altura del terreno', 'm', 'elev_geoid',
+  'Qué tan alto está respecto al "nivel del mar" de Marte. Va subiendo: está escalando el borde del cráter.', 0));
+telemetria.addProvider(proveedorNASA('inclinacion', 'Inclinación', '°', 'tilt',
+  'Cuánto está ladeado el rover. Más de 30° sería peligroso.', 1));
+
+// ---------- Proveedor 2: tiempo de luz Tierra–Marte, calculado en vivo ----------
+// Posición de cada planeta con sus órbitas (elementos de la NASA/JPL, época J2000).
+const ORBITAS = {
+  tierra: { a: 1.00000261, e: 0.01671123, I: -0.00001531, L0: 100.46457166, dL: 35999.37244981, w: 102.93768193, O: 0 },
+  marte:  { a: 1.52371034, e: 0.09339410, I: 1.84969142,  L0: -4.55343205,  dL: 19140.30268499, w: -23.94362959, O: 49.55953891 },
+};
+function posicionPlaneta(o, fecha) {
+  const rad = Math.PI / 180, T = (fecha / 86400000 + 2440587.5 - 2451545) / 36525;
+  const M = ((o.L0 + o.dL * T - o.w) % 360) * rad;
+  let E = M; for (let i = 0; i < 8; i++) E -= (E - o.e * Math.sin(E) - M) / (1 - o.e * Math.cos(E)); // ecuación de Kepler
+  const xp = o.a * (Math.cos(E) - o.e), yp = o.a * Math.sqrt(1 - o.e * o.e) * Math.sin(E);
+  const w = (o.w - o.O) * rad, O = o.O * rad, I = o.I * rad;
+  return [
+    (Math.cos(w) * Math.cos(O) - Math.sin(w) * Math.sin(O) * Math.cos(I)) * xp + (-Math.sin(w) * Math.cos(O) - Math.cos(w) * Math.sin(O) * Math.cos(I)) * yp,
+    (Math.cos(w) * Math.sin(O) + Math.sin(w) * Math.cos(O) * Math.cos(I)) * xp + (-Math.sin(w) * Math.sin(O) + Math.cos(w) * Math.cos(O) * Math.cos(I)) * yp,
+    Math.sin(w) * Math.sin(I) * xp + Math.cos(w) * Math.sin(I) * yp,
+  ];
+}
+function minutosDeLuz(fecha) {
+  const t = posicionPlaneta(ORBITAS.tierra, fecha), m = posicionPlaneta(ORBITAS.marte, fecha);
+  const ua = Math.hypot(m[0] - t[0], m[1] - t[1], m[2] - t[2]);
+  return ua * 149597870.7 / 299792.458 / 60;      // km ÷ velocidad de la luz → minutos
+}
+telemetria.addProvider({
+  key: 'luz', nombre: 'Tiempo de luz Tierra–Marte', unidad: 'min', decimales: 2,
+  proveedor: 'Cálculo en vivo · órbitas JPL',
+  frase: 'Lo que tarda un mensaje en llegar de la Tierra a Percy. Por eso nadie lo maneja con joystick.',
+  async request() {
+    const puntos = [];
+    for (let f = ATERRIZAJE; f < Date.now(); f += 2 * 86400000) puntos.push({ x: solDe(f), y: minutosDeLuz(f) });
+    return puntos;
+  },
+  subscribe(callback) {                            // un dato nuevo cada segundo
+    const id = setInterval(() => callback({ x: solDe(Date.now()), y: minutosDeLuz(Date.now()) }), 1000);
+    return () => clearInterval(id);
+  },
+});
+
+// ---------- Gráfica de toda la misión ----------
+function dibujar(canvas, puntos) {
+  const dpr = devicePixelRatio || 1, W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+  const xs = puntos.map(p => p.x), ys = puntos.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const px = x => (x - x0) / (x1 - x0 || 1) * (W - 4) + 2, py = y => H - 12 - (y - y0) / (y1 - y0 || 1) * (H - 16);
+  g.beginPath(); puntos.forEach((p, i) => i ? g.lineTo(px(p.x), py(p.y)) : g.moveTo(px(p.x), py(p.y)));
+  g.strokeStyle = '#ff9a4d'; g.lineWidth = 1.5; g.stroke();
+  g.lineTo(px(x1), H - 12); g.lineTo(px(x0), H - 12); g.closePath();
+  g.fillStyle = 'rgba(255,140,60,.15)'; g.fill();
+  const u = puntos.at(-1); g.fillStyle = '#fff'; g.beginPath(); g.arc(px(u.x), py(u.y), 2.5, 0, 7); g.fill();
+  g.fillStyle = '#c9a58a'; g.font = '9px ui-monospace, monospace';
+  g.textAlign = 'left'; g.fillText('sol ' + Math.round(x0), 2, H - 1);
+  g.textAlign = 'right'; g.fillText('sol ' + Math.round(x1), W - 2, H - 1);
+}
+
+// ---------- Armar una tarjeta por cada proveedor ----------
+for (const p of telemetria.proveedores) {
+  const div = document.createElement('div');
+  div.className = 'dato cargando'; div.dataset.key = p.key;
+  div.innerHTML = `<div class="cab"><span class="nombre">${p.nombre}</span><span class="prov">${p.proveedor}</span></div>
+    <div class="valor">…<small>${p.unidad}</small></div><canvas></canvas><div class="frase">${p.frase}</div>`;
+  document.getElementById('datos').appendChild(div);
+  const valor = div.querySelector('.valor'), canvas = div.querySelector('canvas');
+  const mostrar = (y) => { valor.innerHTML = `${y.toLocaleString('es', { minimumFractionDigits: p.decimales, maximumFractionDigits: p.decimales })}<small>${p.unidad}</small>`; };
+
+  p.request().then(puntos => {
+    div.classList.remove('cargando');
+    mostrar(puntos.at(-1).y); dibujar(canvas, puntos);
+    window.controlMision.cargados[p.key] = puntos.at(-1).y;
+    window.controlMision.listos = Object.keys(window.controlMision.cargados).length;
+    if (p.subscribe) p.subscribe(d => { mostrar(d.y); window.controlMision.cargados[p.key] = d.y; });
+  }).catch(e => { valor.textContent = 'sin señal'; console.error(`No se pudo cargar "${p.nombre}":`, e); });
+}
+
+// ---------- Tecla T: mostrar u ocultar el panel ----------
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 't' && !e.repeat) document.getElementById('mision').classList.toggle('oculto');
+});
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// ---------- Renderizador (tono de cine + sombras suaves) ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const COLOR_POLVO = new THREE.Color(0xc98a52);
+scene.fog = new THREE.FogExp2(COLOR_POLVO, 0.0065);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(-38, 9, 42);
+
+// ---------- Dirección del sol (bajo, de tarde) ----------
+const dirSol = new THREE.Vector3(1, 0.22, -0.9).normalize();
+
+// ---------- Cielo color caramelo (shader de degradado) ----------
+const cielo = new THREE.Mesh(
+  new THREE.SphereGeometry(900, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { sol: { value: dirSol } },
+    vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 sol; varying vec3 vDir;
+      void main(){
+        float h = clamp(vDir.y, -0.1, 1.0);
+        vec3 horizonte = vec3(0.86, 0.60, 0.36);   // caramelo claro y polvoriento
+        vec3 cenit     = vec3(0.45, 0.26, 0.16);   // caramelo tostado
+        vec3 col = mix(horizonte, cenit, pow(max(h,0.0), 0.55));
+        float d = max(dot(normalize(vDir), sol), 0.0);
+        col += vec3(1.0, 0.78, 0.48) * pow(d, 10.0) * 0.4;   // resplandor amplio
+        col += vec3(1.0, 0.92, 0.75) * pow(d, 1800.0) * 2.2;  // disco del sol
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  })
+);
+scene.add(cielo);
+
+// ---------- Luces ----------
+const sol = new THREE.DirectionalLight(0xffc48a, 3.2);
+sol.position.copy(dirSol).multiplyScalar(120);
+sol.castShadow = true;
+sol.shadow.mapSize.set(2048, 2048);
+sol.shadow.radius = 6;
+sol.shadow.bias = -0.0005;
+Object.assign(sol.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, near: 1, far: 400 });
+scene.add(sol);
+scene.add(new THREE.HemisphereLight(0xe0a070, 0x5a2a14, 0.9));
+
+// ---------- Ruido simple para el terreno ----------
+function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+function ruido(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+// Altura: dunas onduladas + colinas suaves
+function altura(x, z) {
+  const dunas = Math.pow(Math.abs(Math.sin(x * 0.09 + z * 0.04 + ruido(x * 0.02, z * 0.02) * 3)), 1.6) * 3.2;
+  const colinas = ruido(x * 0.012, z * 0.012) * 14 - 5;
+  const detalle = ruido(x * 0.3, z * 0.3) * 0.35;
+  const borde = Math.max(0, Math.hypot(x, z) - 250) * 0.12; // pared del cráter a lo lejos
+  return dunas + colinas + detalle + borde;
+}
+
+// ---------- Terreno ----------
+const geoT = new THREE.PlaneGeometry(1000, 1000, 320, 320);
+geoT.rotateX(-Math.PI / 2);
+const pos = geoT.attributes.position, colores = [];
+const arena = new THREE.Color(0xc0673a), oscuro = new THREE.Color(0x7a3a1e), c = new THREE.Color();
+for (let i = 0; i < pos.count; i++) {
+  const x = pos.getX(i), z = pos.getZ(i), y = altura(x, z);
+  pos.setY(i, y);
+  c.copy(oscuro).lerp(arena, THREE.MathUtils.clamp(0.55 + y * 0.05 + ruido(x * 0.1, z * 0.1) * 0.3, 0, 1));
+  colores.push(c.r, c.g, c.b);
+}
+geoT.setAttribute('color', new THREE.Float32BufferAttribute(colores, 3));
+geoT.computeVertexNormals();
+const terreno = new THREE.Mesh(geoT, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+terreno.receiveShadow = true;
+scene.add(terreno);
+
+// ---------- Rocas ----------
+const matRoca = new THREE.MeshStandardMaterial({ color: 0x8a4a30, roughness: 0.9, flatShading: true });
+for (let i = 0; i < 180; i++) {
+  const g = new THREE.DodecahedronGeometry(1, 1), p = g.attributes.position;
+  for (let j = 0; j < p.count; j++) {
+    const k = 0.7 + hash(i * 3.1 + p.getX(j) * 5, p.getY(j) * 7 + p.getZ(j) * 3) * 0.5;
+    p.setXYZ(j, p.getX(j) * k, p.getY(j) * k * 0.7, p.getZ(j) * k);
+  }
+  g.computeVertexNormals();
+  const roca = new THREE.Mesh(g, matRoca);
+  const r = 6 + Math.pow(hash(i, 1), 0.7) * 140, ang = hash(i, 2) * Math.PI * 2;
+  const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
+  const s = 0.3 + Math.pow(hash(i, 3), 3) * 2.8;
+  roca.scale.setScalar(s);
+  roca.position.set(x, altura(x, z) + s * 0.2, z);
+  roca.rotation.set(hash(i, 4) * 3, hash(i, 5) * 6, hash(i, 6) * 3);
+  roca.castShadow = roca.receiveShadow = true;
+  scene.add(roca);
+}
+
+// ---------- Las dos lunas: Fobos y Deimos ----------
+function crearLuna(radio, semilla) {
+  const g = new THREE.IcosahedronGeometry(radio, 3), p = g.attributes.position;
+  for (let j = 0; j < p.count; j++) {
+    const v = new THREE.Vector3().fromBufferAttribute(p, j);
+    v.multiplyScalar(0.85 + ruido(v.x * 0.4 + semilla, v.y * 0.4 + v.z * 0.3) * 0.3);
+    v.x *= 1.25; // forma de papa
+    p.setXYZ(j, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xb8a89a, emissive: 0x7a5a44, roughness: 1, fog: false }));
+}
+const fobos = crearLuna(20, 1);
+fobos.position.copy(new THREE.Vector3(0.42, 0.27, -1).normalize().multiplyScalar(560)); // Fobos, a la izquierda del sol
+const deimos = crearLuna(9, 9);
+deimos.position.copy(new THREE.Vector3(1.15, 0.3, -0.6).normalize().multiplyScalar(560));
+scene.add(fobos, deimos);
+
+// ---------- Polvo flotando ----------
+const N = 3000, posPolvo = new Float32Array(N * 3);
+for (let i = 0; i < N; i++) {
+  posPolvo[i * 3] = (Math.random() - 0.5) * 200;
+  posPolvo[i * 3 + 1] = Math.random() * 30;
+  posPolvo[i * 3 + 2] = (Math.random() - 0.5) * 200;
+}
+const geoPolvo = new THREE.BufferGeometry();
+geoPolvo.setAttribute('position', new THREE.BufferAttribute(posPolvo, 3));
+const polvo = new THREE.Points(geoPolvo, new THREE.PointsMaterial({
+  color: 0xf0c090, size: 0.18, transparent: true, opacity: 0.55, depthWrite: false }));
+scene.add(polvo);
+
+// ---------- Altura EXACTA de la malla (para que las ruedas toquen el suelo) ----------
+// La malla tiene 321x321 vértices separados 3.125 m; interpolamos dentro del triángulo.
+const SEG = 320, PASO = 1000 / SEG;
+function alturaSuelo(x, z) {
+  const gx = (x + 500) / PASO, gz = (z + 500) / PASO;
+  const col = Math.min(Math.max(Math.floor(gx), 0), SEG - 1), fila = Math.min(Math.max(Math.floor(gz), 0), SEG - 1);
+  const fx = gx - col, fz = gz - fila;
+  const h = (cc, r) => pos.getY(r * (SEG + 1) + cc);
+  const a = h(col, fila), b = h(col, fila + 1), c3 = h(col + 1, fila + 1), d = h(col + 1, fila);
+  return fx + fz <= 1 ? a + (d - a) * fx + (b - a) * fz
+                      : c3 + (b - c3) * (1 - fx) + (d - c3) * (1 - fz);
+}
+
+// ---------- El rover Perseverance (modelo oficial de la NASA) ----------
+const LARGO_REAL = 3.0;   // Perseverance mide ~3 m de largo, 2.7 m de ancho y 2.2 m de alto
+const GIRO_EXTRA = 0;     // si el rover anda "de reversa", cambia esto a Math.PI
+const rover = new THREE.Group();   // "rover" se mueve; el modelo va dentro, ya escalado
+scene.add(rover);
+const estado = { x: 0, z: 0, rumbo: Math.atan2(0.67, -0.74), velocidad: 0, distancia: 0, listo: false };
+window.camarasRover = [];
+
+const draco = new DRACOLoader().setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+new GLTFLoader().setDRACOLoader(draco).load('public/models/perseverance.glb', (gltf) => {
+  const modelo = gltf.scene;
+  modelo.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+
+  // Medimos el modelo y lo escalamos a tamaño real
+  let caja = new THREE.Box3().setFromObject(modelo), tam = caja.getSize(new THREE.Vector3());
+  if (tam.x > tam.z) modelo.rotation.y = Math.PI / 2;   // el lado largo hacia adelante (eje Z)
+  modelo.rotation.y += GIRO_EXTRA;
+  modelo.updateMatrixWorld(true);
+  caja = new THREE.Box3().setFromObject(modelo); tam = caja.getSize(new THREE.Vector3());
+  modelo.scale.multiplyScalar(LARGO_REAL / Math.max(tam.x, tam.z));
+  modelo.updateMatrixWorld(true);
+  caja = new THREE.Box3().setFromObject(modelo);
+  const centro = caja.getCenter(new THREE.Vector3());
+  modelo.position.sub(new THREE.Vector3(centro.x, caja.min.y, centro.z)); // ruedas en y = 0
+  rover.add(modelo);
+  tam = caja.getSize(new THREE.Vector3());
+  console.log(`Rover cargado: ${tam.x.toFixed(2)} x ${tam.y.toFixed(2)} x ${tam.z.toFixed(2)} m`);
+
+  // Piezas que son cámaras (las usaremos al final)
+  modelo.traverse(o => { if (/cam|watson|lens/i.test(o.name) && !/bracket|cover|wiring/i.test(o.name)) window.camarasRover.push(o.name); });
+  console.log('📷 Cámaras del rover:', window.camarasRover.join(', '));
+  crearRuedas(modelo);
+  estado.listo = true;
+  window.roverListo = true;
+}, undefined, (e) => console.error('No se pudo cargar el rover:', e));
+
+// ---------- Ruedas con física ----------
+// En el modelo las 6 ruedas son UNA sola pieza ("Wheels_objs"), así que no pueden girar solas.
+// La escondemos, medimos dónde está cada rueda y ponemos 6 ruedas nuevas hechas con cilindros.
+const ruedas = [];   // { grupo, radio, base (posición de reposo), lado (+1 izq / -1 der), fila (0 delante,1,2 atrás) }
+function crearRuedas(modelo) {
+  let piezas = null;
+  modelo.traverse(o => { if (!piezas && /wheels_objs/i.test(o.name)) piezas = o; });
+  if (!piezas) { console.warn('No encontré las ruedas del modelo'); return; }
+  rover.updateMatrixWorld(true);
+
+  // Juntamos los vértices de todas las mallas de las ruedas, en coordenadas del rover
+  const puntos = [], v = new THREE.Vector3();
+  piezas.traverse(o => {
+    if (!o.isMesh) return;
+    const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i += 3) {
+      v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+      puntos.push(rover.worldToLocal(v.clone()));
+    }
+  });
+  const zMin = Math.min(...puntos.map(p => p.z)), zMax = Math.max(...puntos.map(p => p.z));
+
+  // Repartimos los puntos en 6 grupos: izquierda/derecha × delante/medio/atrás
+  const cajas = Array.from({ length: 6 }, () => new THREE.Box3());
+  for (const p of puntos) {
+    const fila = Math.min(2, Math.floor((zMax - p.z) / (zMax - zMin) * 3));
+    cajas[fila * 2 + (p.x > 0 ? 0 : 1)].expandByPoint(p);
+  }
+
+  const matLlanta = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, metalness: 0.8, roughness: 0.45 });
+  const matRayo = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.4, roughness: 0.7 });
+  cajas.forEach((caja, i) => {
+    const centro = caja.getCenter(new THREE.Vector3()), tam = caja.getSize(new THREE.Vector3());
+    const radio = tam.y / 2, ancho = Math.max(tam.x, 0.1);
+    const grupo = new THREE.Group();
+    grupo.rotation.order = 'YXZ';               // primero la dirección (Y), luego el giro (X)
+    const giro = new THREE.Group();              // esta parte es la que rueda
+    const llanta = new THREE.Mesh(new THREE.CylinderGeometry(radio, radio, ancho, 28, 1, true).rotateZ(Math.PI / 2), matLlanta);
+    giro.add(llanta);
+    for (let k = 0; k < 6; k++) {                // rayos: así se nota que la rueda gira
+      const rayo = new THREE.Mesh(new THREE.BoxGeometry(ancho * 0.3, radio * 1.9, radio * 0.12), matRayo);
+      rayo.rotation.x = k * Math.PI / 6;
+      giro.add(rayo);
+    }
+    for (let k = 0; k < 16; k++) {               // tacos de la llanta (grousers)
+      const a = k / 16 * Math.PI * 2;
+      const taco = new THREE.Mesh(new THREE.BoxGeometry(ancho, 0.025, 0.035), matRayo);
+      taco.position.set(0, Math.cos(a) * radio, Math.sin(a) * radio);
+      taco.rotation.x = a;
+      giro.add(taco);
+    }
+    giro.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    grupo.add(giro);
+    grupo.position.copy(centro);
+    rover.add(grupo);
+    ruedas.push({ grupo, giro, radio, base: centro.clone(), lado: i % 2 === 0 ? 1 : -1, fila: Math.floor(i / 2) });
+  });
+  piezas.visible = false;
+  console.log(`🛞 ${ruedas.length} ruedas con física (radio ${ruedas[0].radio.toFixed(2)} m)`);
+}
+
+// Física de las ruedas, cada cuadro:
+//  1) Giro: cada rueda gira según lo que avanza (ángulo = distancia / radio).
+//     Al girar el rover, las ruedas de afuera van más rápido que las de adentro.
+//  2) Dirección: las 4 ruedas de las esquinas se orientan (como el rover real).
+//  3) Suspensión: cada rueda sube o baja para tocar el suelo que tiene debajo.
+const tmp = new THREE.Vector3();
+function moverRuedas(dt, giroTecla, velGiro) {
+  for (const r of ruedas) {
+    const mitadAncho = Math.abs(r.base.x);
+    const vel = estado.velocidad - r.lado * velGiro * mitadAncho;   // m/s de esta rueda
+    r.giro.rotation.x += vel / r.radio * dt;
+
+    const dir = r.fila === 0 ? 0.35 : r.fila === 2 ? -0.35 : 0;      // las del medio no giran
+    r.grupo.rotation.y += (giroTecla * dir - r.grupo.rotation.y) * Math.min(dt * 6, 1);
+
+    tmp.copy(r.base); rover.localToWorld(tmp);
+    const sueloLocal = alturaSuelo(tmp.x, tmp.z) - rover.position.y;  // suelo bajo la rueda vs. el rover
+    const objetivo = THREE.MathUtils.clamp(sueloLocal, -0.25, 0.25);  // la suspensión tiene un límite
+    r.grupo.position.y += (r.base.y + objetivo - r.grupo.position.y) * Math.min(dt * 10, 1);
+  }
+}
+
+// ---------- Teclado WASD ----------
+const teclas = {};
+addEventListener('keydown', e => { teclas[e.key.toLowerCase()] = true; });
+addEventListener('keyup', e => { teclas[e.key.toLowerCase()] = false; });
+
+// ---------- Huellas de las ruedas (muchas copias de un mismo rectángulo) ----------
+const MAX_HUELLAS = 4000;
+const huellas = new THREE.InstancedMesh(
+  new THREE.PlaneGeometry(0.42, 0.22).rotateX(-Math.PI / 2),
+  new THREE.MeshStandardMaterial({ color: 0x4a2010, roughness: 1, transparent: true, opacity: 0.55,
+    depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }),
+  MAX_HUELLAS);
+huellas.count = 0;
+huellas.receiveShadow = true;
+huellas.frustumCulled = false;
+scene.add(huellas);
+let siguienteHuella = 0;
+const ultimaHuella = new THREE.Vector3(1e9, 0, 0);
+const m4 = new THREE.Matrix4(), arriba = new THREE.Vector3(0, 1, 0), uno = new THREE.Vector3(1, 1, 1);
+
+function normalSuelo(x, z) {
+  const e = 0.6;
+  return new THREE.Vector3(alturaSuelo(x - e, z) - alturaSuelo(x + e, z), 2 * e,
+                           alturaSuelo(x, z - e) - alturaSuelo(x, z + e)).normalize();
+}
+function orientacion(x, z, rumbo) {   // inclinación según la pendiente + hacia dónde mira
+  const q = new THREE.Quaternion().setFromUnitVectors(arriba, normalSuelo(x, z));
+  return q.multiply(new THREE.Quaternion().setFromAxisAngle(arriba, rumbo));
+}
+function dejarHuellas() {
+  const lado = new THREE.Vector3(Math.cos(estado.rumbo), 0, -Math.sin(estado.rumbo));
+  for (const s of [-1, 1]) {          // rueda izquierda y derecha (separadas ~2.2 m)
+    const x = estado.x + lado.x * 1.1 * s, z = estado.z + lado.z * 1.1 * s;
+    m4.compose(new THREE.Vector3(x, alturaSuelo(x, z) + 0.02, z), orientacion(x, z, estado.rumbo), uno);
+    huellas.setMatrixAt(siguienteHuella, m4);
+    siguienteHuella = (siguienteHuella + 1) % MAX_HUELLAS;
+    huellas.count = Math.min(huellas.count + 1, MAX_HUELLAS);
+  }
+  huellas.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- La luz del sol sigue al rover (sombras nítidas cerca) ----------
+scene.add(sol.target);
+Object.assign(sol.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40 });
+sol.shadow.camera.updateProjectionMatrix();
+
+// ---------- Animación ----------
+const reloj = new THREE.Clock();
+const camDeseada = new THREE.Vector3(), mirar = new THREE.Vector3();
+camera.position.set(-5, 8, 8);
+function animar() {
+  const dt = Math.min(reloj.getDelta(), 0.2), t = reloj.elapsedTime;  // máx. 0.2 s por cuadro
+
+  // Manejo: W/S avanza y retrocede, A/D gira (más rápido que el real, que va a ~4 cm/s 😉)
+  const avance = (teclas['w'] ? 1 : 0) - (teclas['s'] ? 1 : 0);
+  const giro = (teclas['a'] ? 1 : 0) - (teclas['d'] ? 1 : 0);
+  estado.velocidad += (avance * 4 - estado.velocidad) * Math.min(dt * 2, 1);
+  estado.rumbo += giro * dt * 0.8;
+  const adelante = new THREE.Vector3(Math.sin(estado.rumbo), 0, Math.cos(estado.rumbo));
+  estado.x = THREE.MathUtils.clamp(estado.x + adelante.x * estado.velocidad * dt, -240, 240);
+  estado.z = THREE.MathUtils.clamp(estado.z + adelante.z * estado.velocidad * dt, -240, 240);
+  estado.distancia += Math.abs(estado.velocidad * dt);
+  document.getElementById('dist').textContent = estado.distancia.toFixed(1) + ' m';
+
+  // Apoyar el rover sobre el terreno e inclinarlo con la pendiente
+  rover.position.set(estado.x, alturaSuelo(estado.x, estado.z), estado.z);
+  rover.quaternion.slerp(orientacion(estado.x, estado.z, estado.rumbo), Math.min(dt * 8, 1));
+  rover.updateMatrixWorld();
+  moverRuedas(dt, giro, giro * 0.8);
+
+  // Huellas cada 30 cm
+  if (estado.listo && rover.position.distanceTo(ultimaHuella) > 0.3) { dejarHuellas(); ultimaHuella.copy(rover.position); }
+
+  // Cámara que sigue al rover desde atrás y un poco arriba
+  camDeseada.copy(rover.position).addScaledVector(adelante, -8);
+  camDeseada.y += 3.2;
+  camDeseada.y = Math.max(camDeseada.y, alturaSuelo(camDeseada.x, camDeseada.z) + 1.5);
+  camera.position.lerp(camDeseada, Math.min(dt * 3, 1));
+  mirar.copy(rover.position).addScaledVector(adelante, 4);
+  mirar.y += 1.2;
+  camera.lookAt(mirar);
+
+  // Sol y polvo acompañan al rover
+  sol.target.position.copy(rover.position);
+  sol.position.copy(rover.position).addScaledVector(dirSol, 120);
+  polvo.position.set(estado.x, rover.position.y - 5, estado.z);
+  for (let i = 0; i < N; i++) {        // el viento empuja el polvo
+    let x = posPolvo[i * 3] + 0.06;
+    if (x > 100) x = -100;
+    posPolvo[i * 3] = x;
+    posPolvo[i * 3 + 1] += Math.sin(t + i) * 0.004;
+  }
+  geoPolvo.attributes.position.needsUpdate = true;
+  fobos.rotation.y = t * 0.05; deimos.rotation.y = -t * 0.03;
+  renderer.render(scene, camera);
+  requestAnimationFrame(animar);
+}
+animar();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
