@@ -1,0 +1,154 @@
+{
+ "Mastcam_Z_cams": [
+  {
+   "id": "ZL0_2024_0846622583_145EBY_N0930000ZCAM10058_1100LMJ",
+   "sol": 2024,
+   "fecha": "2026-10-30T09:21:53.576",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02024/ids/edr/browse/zcam/ZL0_2024_0846622583_145EBY_N0930000ZCAM10058_1100LMJ02_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/ZL0_2024_0846622583_145EBY_N0930000ZCAM10058_1100LMJ",
+   "archivo": "public/fotos/ZL0_2024_0846622583_145EBY_N0930000ZCAM10058_1100LMJ.jpg"
+  },
+  {
+   "id": "ZL0_2024_0846622393_151EBY_N0930000ZCAM10058_1100LMJ",
+   "sol": 2024,
+   "fecha": "2026-10-30T09:18:51.583",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02024/ids/edr/browse/zcam/ZL0_2024_0846622393_151EBY_N0930000ZCAM10058_1100LMJ02_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/ZL0_2024_0846622393_151EBY_N0930000ZCAM10058_1100LMJ",
+   "archivo": "public/fotos/ZL0_2024_0846622393_151EBY_N0930000ZCAM10058_1100LMJ.jpg"
+  },
+  {
+   "id": "ZL0_2024_0846621844_144EBY_N0930000ZCAM10058_1100LMJ",
+   "sol": 2024,
+   "fecha": "2026-10-30T09:09:39.574",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02024/ids/edr/browse/zcam/ZL0_2024_0846621844_144EBY_N0930000ZCAM10058_1100LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/ZL0_2024_0846621844_144EBY_N0930000ZCAM10058_1100LMJ",
+   "archivo": "public/fotos/ZL0_2024_0846621844_144EBY_N0930000ZCAM10058_1100LMJ.jpg"
+  },
+  {
+   "id": "ZL0_2024_0846621971_145EBY_N0930000ZCAM10058_1100LMJ",
+   "sol": 2024,
+   "fecha": "2026-10-30T09:11:35.580",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02024/ids/edr/browse/zcam/ZL0_2024_0846621971_145EBY_N0930000ZCAM10058_1100LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/ZL0_2024_0846621971_145EBY_N0930000ZCAM10058_1100LMJ",
+   "archivo": "public/fotos/ZL0_2024_0846621971_145EBY_N0930000ZCAM10058_1100LMJ.jpg"
+  },
+  {
+   "id": "ZL0_2023_0846533206_488EBY_N0930000ZCAM10057_1100LMJ",
+   "sol": 2023,
+   "fecha": "2026-10-29T08:32:17.868",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02023/ids/edr/browse/zcam/ZL0_2023_0846533206_488EBY_N0930000ZCAM10057_1100LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/ZL0_2023_0846533206_488EBY_N0930000ZCAM10057_1100LMJ",
+   "archivo": "public/fotos/ZL0_2023_0846533206_488EBY_N0930000ZCAM10057_1100LMJ.jpg"
+  }
+ ],
+ "NavCams": [
+  {
+   "id": "NLF_2022_0846456110_237ECM_N0930000NCAM02022_01_195J",
+   "sol": 2022,
+   "fecha": "2026-10-28T11:07:05.389",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02022/ids/edr/browse/ncam/NLF_2022_0846456110_237ECM_N0930000NCAM02022_01_195J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/NLF_2022_0846456110_237ECM_N0930000NCAM02022_01_195J",
+   "archivo": "public/fotos/NLF_2022_0846456110_237ECM_N0930000NCAM02022_01_195J.jpg"
+  },
+  {
+   "id": "NLF_2023_0846548592_316ECM_N0930000NCAM00347_01_195J",
+   "sol": 2023,
+   "fecha": "2026-10-29T12:48:30.042",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02023/ids/edr/browse/ncam/NLF_2023_0846548592_316ECM_N0930000NCAM00347_01_195J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/NLF_2023_0846548592_316ECM_N0930000NCAM00347_01_195J",
+   "archivo": "public/fotos/NLF_2023_0846548592_316ECM_N0930000NCAM00347_01_195J.jpg"
+  },
+  {
+   "id": "NLF_2022_0846455939_237ECM_N0930000NCAM02022_04_195J",
+   "sol": 2022,
+   "fecha": "2026-10-28T11:04:14.239",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02022/ids/edr/browse/ncam/NLF_2022_0846455939_237ECM_N0930000NCAM02022_04_195J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/NLF_2022_0846455939_237ECM_N0930000NCAM02022_04_195J",
+   "archivo": "public/fotos/NLF_2022_0846455939_237ECM_N0930000NCAM02022_04_195J.jpg"
+  },
+  {
+   "id": "NLF_2022_0846455714_722ECM_N0930000NCAM13022_01_195J",
+   "sol": 2022,
+   "fecha": "2026-10-28T11:00:30.791",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02022/ids/edr/browse/ncam/NLF_2022_0846455714_722ECM_N0930000NCAM13022_01_195J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/NLF_2022_0846455714_722ECM_N0930000NCAM13022_01_195J",
+   "archivo": "public/fotos/NLF_2022_0846455714_722ECM_N0930000NCAM13022_01_195J.jpg"
+  },
+  {
+   "id": "NLF_2023_0846549056_005ECM_N0930000NCAM00709_03_095J",
+   "sol": 2023,
+   "fecha": "2026-10-29T12:56:14.159",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02023/ids/edr/browse/ncam/NLF_2023_0846549056_005ECM_N0930000NCAM00709_03_095J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/NLF_2023_0846549056_005ECM_N0930000NCAM00709_03_095J",
+   "archivo": "public/fotos/NLF_2023_0846549056_005ECM_N0930000NCAM00709_03_095J.jpg"
+  }
+ ],
+ "hazcams_front": [
+  {
+   "id": "FLF_2019_0846185639_601ECM_N0920000FHAZ00206_01_295J",
+   "sol": 2019,
+   "fecha": "2026-10-25T07:59:12.971",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02019/ids/edr/browse/fcam/FLF_2019_0846185639_601ECM_N0920000FHAZ00206_01_295J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/FLF_2019_0846185639_601ECM_N0920000FHAZ00206_01_295J",
+   "archivo": "public/fotos/FLF_2019_0846185639_601ECM_N0920000FHAZ00206_01_295J.jpg"
+  },
+  {
+   "id": "FLF_2022_0846447347_237ECM_N0930000FHAZ02008_12_090J",
+   "sol": 2022,
+   "fecha": "2026-10-28T08:41:02.463",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02022/ids/edr/browse/fcam/FLF_2022_0846447347_237ECM_N0930000FHAZ02008_12_090J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/FLF_2022_0846447347_237ECM_N0930000FHAZ02008_12_090J",
+   "archivo": "public/fotos/FLF_2022_0846447347_237ECM_N0930000FHAZ02008_12_090J.jpg"
+  },
+  {
+   "id": "FLF_2018_0846090574_426ECM_N0920000FHAZ02008_02_095J",
+   "sol": 2018,
+   "fecha": "2026-10-24T05:34:46.324",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02018/ids/edr/browse/fcam/FLF_2018_0846090574_426ECM_N0920000FHAZ02008_02_095J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/FLF_2018_0846090574_426ECM_N0920000FHAZ02008_02_095J",
+   "archivo": "public/fotos/FLF_2018_0846090574_426ECM_N0920000FHAZ02008_02_095J.jpg"
+  },
+  {
+   "id": "FLF_2018_0846088669_950ECM_N0920000FHAZ00203_19_295J",
+   "sol": 2018,
+   "fecha": "2026-10-24T05:03:02.477",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02018/ids/edr/browse/fcam/FLF_2018_0846088669_950ECM_N0920000FHAZ00203_19_295J01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/FLF_2018_0846088669_950ECM_N0920000FHAZ00203_19_295J",
+   "archivo": "public/fotos/FLF_2018_0846088669_950ECM_N0920000FHAZ00203_19_295J.jpg"
+  }
+ ],
+ "WATSON": [
+  {
+   "id": "SIF_2023_0846549705_738EBY_N0930000SRLC02503_0000LMJ",
+   "sol": 2023,
+   "fecha": "2026-10-29T13:07:04.002",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02023/ids/edr/browse/shrlc/SIF_2023_0846549705_738EBY_N0930000SRLC02503_0000LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/SIF_2023_0846549705_738EBY_N0930000SRLC02503_0000LMJ",
+   "archivo": "public/fotos/SIF_2023_0846549705_738EBY_N0930000SRLC02503_0000LMJ.jpg"
+  },
+  {
+   "id": "SIF_2019_0846185766_167EBY_N0920000SRLC00878_0000LMJ",
+   "sol": 2019,
+   "fecha": "2026-10-25T08:01:52.101",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02019/ids/edr/browse/shrlc/SIF_2019_0846185766_167EBY_N0920000SRLC00878_0000LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/SIF_2019_0846185766_167EBY_N0920000SRLC00878_0000LMJ",
+   "archivo": "public/fotos/SIF_2019_0846185766_167EBY_N0920000SRLC00878_0000LMJ.jpg"
+  },
+  {
+   "id": "SIF_2023_0846550026_515EBY_N0930000SRLC00630_0000LMJ",
+   "sol": 2023,
+   "fecha": "2026-10-29T13:12:46.007",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02023/ids/edr/browse/shrlc/SIF_2023_0846550026_515EBY_N0930000SRLC00630_0000LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/SIF_2023_0846550026_515EBY_N0930000SRLC00630_0000LMJ",
+   "archivo": "public/fotos/SIF_2023_0846550026_515EBY_N0930000SRLC00630_0000LMJ.jpg"
+  },
+  {
+   "id": "SIF_2021_0846350792_144EBY_N0920000SRLC07008_0000LMJ",
+   "sol": 2021,
+   "fecha": "2026-10-27T05:51:49.412",
+   "url": "https://mars.nasa.gov/mars2020-raw-images/pub/ods/surface/sol/02021/ids/edr/browse/shrlc/SIF_2021_0846350792_144EBY_N0920000SRLC07008_0000LMJ01_1200.jpg",
+   "link": "https://mars.nasa.gov/mars2020/multimedia/raw-images/SIF_2021_0846350792_144EBY_N0920000SRLC07008_0000LMJ",
+   "archivo": "public/fotos/SIF_2021_0846350792_144EBY_N0920000SRLC07008_0000LMJ.jpg"
+  }
+ ]
+}

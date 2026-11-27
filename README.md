@@ -74,6 +74,7 @@ npm run check              # automated QA
 | Modelo 3D del rover | `public/models/perseverance.glb` | [NASA 3D Resources](https://science.nasa.gov/3d-resources/) |
 | Recorrido real (hasta el sol 2022) | `public/data/M20_waypoints.json` | NASA/JPL, Mars 2020 MMGIS maps |
 | Órbitas de la Tierra y Marte | `perseverance.html` | Elementos orbitales NASA/JPL (J2000) |
+| Fotos reales de las cámaras de Percy (soles 2018–2024) | `public/fotos/` | [NASA Mars 2020 Raw Images](https://mars.nasa.gov/mars2020/multimedia/raw-images/) (API `mars.nasa.gov/rss/api/?feed=raw_images`) |
 
 Imágenes y modelos de la NASA: cortesía de NASA/JPL-Caltech. La NASA no respalda este proyecto. *NASA does not endorse this project.* Ver las [pautas de uso de medios de la NASA](https://www.nasa.gov/nasa-brand-center/images-and-media/).
 

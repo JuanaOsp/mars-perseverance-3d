@@ -29,6 +29,46 @@
   .dato canvas { width: 100%; height: 46px; display: block; margin: 4px 0; }
   .dato .frase { color: #e8cdb5; font-size: 12px; }
   .dato.cargando .valor { color: #a88; }
+
+  /* ---------- Cámaras del rover: puntos que brillan ---------- */
+  .camara { position: fixed; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; padding: 0;
+            border: 2px solid #fff; border-radius: 50%; background: #5ff2ff; cursor: pointer; z-index: 5;
+            box-shadow: 0 0 10px 3px #5ff2ff, 0 0 24px 8px rgba(95, 242, 255, .45);
+            animation: latido 1.6s ease-in-out infinite; }
+  .camara.escondida { display: none; }
+  .camara span { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); white-space: nowrap;
+                 padding: 4px 9px; border-radius: 6px; background: rgba(10, 20, 28, .88); color: #bff8ff;
+                 font: 600 12px system-ui, sans-serif; letter-spacing: .05em; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .camara:hover span { opacity: 1; }
+  .camara:hover { background: #fff; }
+  @keyframes latido { 50% { transform: scale(1.35); box-shadow: 0 0 16px 6px #5ff2ff, 0 0 40px 14px rgba(95, 242, 255, .35); } }
+
+  /* ---------- Visor de fotos ---------- */
+  #visor { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; background: rgba(6, 3, 2, .9);
+           font: 14px system-ui, sans-serif; color: #ffe9d2; }
+  #visor.abierto { display: grid; }
+  #marco { position: relative; max-width: 86vw; text-align: center; }
+  #foto { display: block; max-width: 86vw; max-height: 74vh; border-radius: 6px; cursor: zoom-in;
+          box-shadow: 0 10px 60px rgba(0, 0, 0, .8);
+          /* la foto empieza "sin revelar" y se revela poco a poco */
+          opacity: 0; filter: blur(24px) brightness(2.5) saturate(0); clip-path: inset(50% 0 50% 0);
+          transition: opacity 1s, filter 3s ease-out, clip-path 1.4s ease-out; }
+  #foto.revelada { opacity: 1; filter: none; clip-path: inset(0 0 0 0); }
+  #visor.ampliada #foto { max-width: 100vw; max-height: 100vh; border-radius: 0; cursor: zoom-out; }
+  #visor.ampliada #pie, #visor.ampliada #ayuda { display: none; }
+  #pie { margin-top: 12px; font-size: 16px; }
+  #pie b { color: #ffb472; letter-spacing: .08em; }
+  #ayuda { margin-top: 6px; font-size: 12px; color: #b89a85; }
+  /* obturador: dos cortinas negras que se cierran y se abren */
+  #visor::before, #visor::after { content: ''; position: fixed; left: 0; right: 0; height: 50%; background: #000; z-index: 2;
+                                  transform: scaleY(0); pointer-events: none; }
+  #visor::before { top: 0; transform-origin: top; }
+  #visor::after { bottom: 0; transform-origin: bottom; }
+  #visor.disparo::before, #visor.disparo::after { animation: obturador .35s ease-in-out; }
+  @keyframes obturador { 50% { transform: scaleY(1); } }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 3; }
+  #flash.on { animation: flash .6s ease-out; }
+  @keyframes flash { 0% { opacity: 0; } 15% { opacity: .95; } 100% { opacity: 0; } }
 </style>
 <script type="importmap">
 { "imports": {
@@ -42,6 +82,15 @@
 <div id="mision">
   <h2>Control de misión <small id="fuente">conectando…</small></h2>
   <div id="datos"></div>
+</div>
+<div id="camaras"></div>
+<div id="visor">
+  <div id="marco">
+    <img id="foto" alt="Foto real de Marte tomada por Perseverance">
+    <div id="pie"></div>
+    <div id="ayuda">Clic en la foto para ampliar · ← → más fotos de esta cámara · Esc para volver</div>
+  </div>
+  <div id="flash"></div>
 </div>
 
 <script type="module">
@@ -354,6 +403,7 @@ new GLTFLoader().setDRACOLoader(draco).load('public/models/perseverance.glb', (g
   modelo.traverse(o => { if (/cam|watson|lens/i.test(o.name) && !/bracket|cover|wiring/i.test(o.name)) window.camarasRover.push(o.name); });
   console.log('📷 Cámaras del rover:', window.camarasRover.join(', '));
   crearRuedas(modelo);
+  crearCamaras(modelo);
   estado.listo = true;
   window.roverListo = true;
 }, undefined, (e) => console.error('No se pudo cargar el rover:', e));
@@ -440,6 +490,96 @@ function moverRuedas(dt, giroTecla, velGiro) {
     r.grupo.position.y += (r.base.y + objetivo - r.grupo.position.y) * Math.min(dt * 10, 1);
   }
 }
+
+// ---------- Las cámaras de Percy toman fotos reales de Marte ----------
+// Las fotos son reales: vienen de la API de imágenes crudas de la NASA
+// (mars.nasa.gov/rss/api/?feed=raw_images&category=mars2020). Las escogimos a mano
+// (a color, con horizonte, el brazo, rocas de cerca) y guardamos copia en public/fotos/.
+const CAMARAS = {
+  Mastcam_Z_cams: 'Mastcam-Z',
+  NavCams: 'NavCam',
+  hazcams_front: 'Hazcam frontal',
+  WATSON: 'WATSON · cámara del brazo',
+};
+// Mastcam y NavCam están casi en el mismo sitio del mástil: los separamos unos píxeles para poder hacer clic
+const SEPARACION = { Mastcam_Z_cams: [-14, -12], NavCams: [14, -12], hazcams_front: [0, 8], WATSON: [0, 0] };
+const puntos = [];     // { pieza, centro (en coordenadas de la pieza), boton, separacion }
+let fotos = {};
+fetch('public/fotos/fotos.json').then(r => r.json()).then(d => { fotos = d; });
+
+function crearCamaras(modelo) {
+  for (const [nombre, titulo] of Object.entries(CAMARAS)) {
+    const pieza = modelo.getObjectByName(nombre);
+    if (!pieza) { console.warn('No encontré la cámara', nombre); continue; }
+    // Centro de la pieza, guardado en sus propias coordenadas para que siga al rover
+    const centro = pieza.worldToLocal(new THREE.Box3().setFromObject(pieza).getCenter(new THREE.Vector3()));
+    const boton = document.createElement('button');
+    boton.className = 'camara';
+    boton.dataset.cam = nombre;
+    boton.innerHTML = `<span>📷 ${titulo}</span>`;
+    boton.addEventListener('click', () => abrirCamara(nombre));
+    document.getElementById('camaras').append(boton);
+    puntos.push({ pieza, centro, boton, separacion: SEPARACION[nombre] });
+  }
+  console.log(`📷 ${puntos.length} cámaras listas para tomar fotos`);
+}
+
+// Cada cuadro: pasamos la posición 3D de cada cámara a un punto de la pantalla
+const enPantalla = new THREE.Vector3();
+function moverPuntos() {
+  for (const p of puntos) {
+    enPantalla.copy(p.centro); p.pieza.localToWorld(enPantalla); enPantalla.project(camera);
+    const visible = enPantalla.z < 1 && Math.abs(enPantalla.x) < 1 && Math.abs(enPantalla.y) < 1;
+    p.boton.classList.toggle('escondida', !visible);
+    // (usamos left/top porque "transform" lo ocupa la animación del brillo)
+    p.boton.style.left = (enPantalla.x + 1) / 2 * innerWidth + p.separacion[0] + 'px';
+    p.boton.style.top = (1 - enPantalla.y) / 2 * innerHeight + p.separacion[1] + 'px';
+  }
+}
+
+// El visor: obturador, flash y la foto que se revela poco a poco
+const visor = document.getElementById('visor'), imgFoto = document.getElementById('foto');
+const vista = { camara: null, indice: 0 };
+window.visorFotos = vista;   // npm run check revisa esto
+
+function abrirCamara(nombre) {
+  for (const k in teclas) teclas[k] = false;   // el rover se detiene mientras miramos
+  vista.camara = nombre; vista.indice = 0;
+  visor.classList.add('abierto'); visor.classList.remove('ampliada');
+  mostrarFoto();
+}
+function mostrarFoto() {
+  const lista = fotos[vista.camara] || [];
+  if (!lista.length) { document.getElementById('pie').textContent = 'Cargando fotos…'; return; }
+  const f = lista[vista.indice];
+  // 1) obturador y flash
+  for (const [el, clase] of [[visor, 'disparo'], [document.getElementById('flash'), 'on']]) {
+    el.classList.remove(clase); void el.offsetWidth; el.classList.add(clase);   // reinicia la animación
+  }
+  // 2) la foto aparece "sin revelar" y se revela cuando termina de cargar
+  imgFoto.classList.remove('revelada');
+  imgFoto.onload = () => setTimeout(() => imgFoto.classList.add('revelada'), 250);
+  imgFoto.src = f.archivo;
+  // 3) el pie: cámara, sol y hace cuántos días
+  const dias = Math.round((Date.now() - Date.parse(f.fecha + 'Z')) / 86400000);
+  const hace = dias <= 0 ? 'hoy' : dias === 1 ? 'hace 1 día' : `hace ${dias} días`;
+  document.getElementById('pie').innerHTML =
+    `<b>${CAMARAS[vista.camara].toUpperCase()}</b> · Sol ${f.sol} · ${hace} · foto ${vista.indice + 1} de ${lista.length}` +
+    ` · <a href="${f.link}" target="_blank" style="color:#ffcf9e">NASA/JPL-Caltech</a>`;
+}
+function cerrarVisor() { visor.classList.remove('abierto', 'ampliada'); vista.camara = null; }
+imgFoto.addEventListener('click', () => visor.classList.toggle('ampliada'));
+visor.addEventListener('click', e => { if (e.target === visor) cerrarVisor(); });
+
+// Con el visor abierto el teclado es del visor, no del rover (se escucha antes que los demás)
+addEventListener('keydown', e => {
+  if (!vista.camara) return;
+  e.stopImmediatePropagation();
+  const n = (fotos[vista.camara] || []).length;
+  if (e.key === 'Escape') cerrarVisor();
+  else if (e.key === 'ArrowRight' && n) { vista.indice = (vista.indice + 1) % n; mostrarFoto(); }
+  else if (e.key === 'ArrowLeft' && n) { vista.indice = (vista.indice - 1 + n) % n; mostrarFoto(); }
+}, true);
 
 // ---------- Teclado WASD ----------
 const teclas = {};
@@ -536,6 +676,7 @@ function animar() {
   geoPolvo.attributes.position.needsUpdate = true;
   fobos.rotation.y = t * 0.05; deimos.rotation.y = -t * 0.03;
   renderer.render(scene, camera);
+  moverPuntos();
   requestAnimationFrame(animar);
 }
 animar();

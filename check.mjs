@@ -10,7 +10,7 @@ const navegador = await chromium.launch({
 const pagina = await navegador.newPage({ viewport: { width: 1280, height: 720 } });
 pagina.on('console', m => {
   if (m.type() === 'error') errores.push('console: ' + m.text());
-  else if (/Rover|Cámaras|ruedas|rueda/.test(m.text())) console.log('ℹ️  ' + m.text());
+  else if (/Rover|Cámaras|ruedas|rueda|cámaras/.test(m.text())) console.log('ℹ️  ' + m.text());
 });
 pagina.on('pageerror', e => errores.push('pageerror: ' + e.message));
 pagina.on('requestfailed', r => errores.push('request: ' + r.url() + ' ' + r.failure()?.errorText));
@@ -42,6 +42,31 @@ try {
   await pagina.waitForTimeout(500);
   await pagina.screenshot({ path: 'captura.png' });
   console.log('📸 Captura guardada en captura.png');
+
+  // Cámaras del rover: cada una debe abrir una foto real de Marte
+  const fotoLista = () => pagina.waitForFunction(() => {
+    const img = document.getElementById('foto');
+    return img.complete && img.naturalWidth > 0 && img.classList.contains('revelada');
+  }, null, { timeout: 15000 });
+  for (const cam of ['Mastcam_Z_cams', 'NavCams', 'hazcams_front', 'WATSON']) {
+    try {
+      await pagina.click(`.camara[data-cam="${cam}"]`, { force: true, timeout: 5000 });
+      await fotoLista();
+      const pie = await pagina.textContent('#pie');
+      await pagina.keyboard.press('ArrowRight');   // otra foto de la misma cámara
+      await pagina.waitForTimeout(100);
+      await fotoLista();
+      console.log(`📷 ${pie.split(' · NASA')[0]} (→ también funciona)`);
+      await pagina.keyboard.press('Escape');
+      if (await pagina.evaluate(() => window.visorFotos.camara)) errores.push(`${cam}: Esc no cerró el visor`);
+    } catch (e) { errores.push(`cámara ${cam}: no abrió una foto (${e.message.split('\n')[0]})`); }
+  }
+  // Captura con una foto abierta
+  await pagina.click('.camara[data-cam="NavCams"]', { force: true });
+  await fotoLista().catch(() => {});
+  await pagina.waitForTimeout(3500);   // esperamos a que termine de revelarse
+  await pagina.screenshot({ path: 'captura-foto.png' });
+  console.log('📸 Captura con la foto abierta en captura-foto.png');
 } catch (e) { errores.push('navegación: ' + e.message); }
 await navegador.close();
 if (errores.length) { console.log(`❌ ${errores.length} error(es):`); errores.forEach(e => console.log(' - ' + e)); process.exit(1); }
